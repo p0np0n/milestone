@@ -1,4 +1,7 @@
 ActiveAdmin.setup do |config|
+  include ActionView::Helpers::AssetUrlHelper
+  include Webpacker::Helper
+
   # == Site Title
   #
   # Set the title that is displayed on the main layout

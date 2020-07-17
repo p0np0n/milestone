@@ -16,9 +16,18 @@ ActiveAdmin.register AdminUser do
   filter :sign_in_count
   filter :created_at
 
-  form do |f|
+  form(data: {controller: "hello"}) do |f|
     f.inputs do
-      f.input :email
+      f.input :email, input_html: {
+        data:{
+          target: 'hello.email',
+          action: 'keyup->hello#say_something'
+        }
+      }
+      li do
+        label 'Greeting'
+        span('data-target': 'hello.output') {}
+      end
       f.input :password
       f.input :password_confirmation
     end
