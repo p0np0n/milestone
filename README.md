@@ -1,3 +1,5 @@
 # Milestone Project
 
-This repository has created to represent Rails 6 features with VueJS as a Front-end and so on.
+## Get rid of warning
+
+`RUBYOPT='-W:no-deprecated -W:no-experimental' bin/rails s`
