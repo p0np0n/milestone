@@ -1,0 +1,108 @@
+version: '3.4'
+
+services:
+  app: &app
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        RUBY_VERSION: '2.7.0'
+        PG_MAJOR: '11'
+        NODE_MAJOR: '12'
+        YARN_VERSION: '1.19.1'
+        BUNDLER_VERSION: '2.0.2'
+    image: mycloud-dev:1.1.0
+    tmpfs:
+      - /tmp
+
+  backend: &backend
+    <<: *app
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./:/app:cached
+      - rails_cache:/app/tmp/cache
+      - bundle:/bundle
+      - node_modules:/app/node_modules
+      - packs:/app/public/packs
+      - ./dockerdev/.psqlrc:/root/.psqlrc:ro
+      - ~/.ssh/id_rsa:/root/.ssh/id_rsa
+      - $SSH_AUTH_SOCK:/ssh-agent
+    environment:
+      - NODE_ENV=development
+      - RAILS_ENV=${RAILS_ENV:-development}
+      - REDIS_URL=redis://redis:6379/
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432
+      - BOOTSNAP_CACHE_DIR=/bundle/bootsnap
+      - WEBPACKER_DEV_SERVER_HOST=webpacker
+      - WEB_CONCURRENCY=1
+      - HISTFILE=./app/log/.bash_history
+      - PSQL_HISTFILE=./app/log/.psql_history
+      - EDITOR=vi
+    depends_on:
+      - postgres
+      - redis
+
+  runner:
+    <<: *backend
+    command: /bin/bash
+    ports:
+      - '3000:3000'
+      - '3002:3002'
+
+  rails:
+    <<: *backend
+    command: bundle exec rails server -b 0.0.0.0
+    ports:
+      - '3000:3000'
+
+  sidekiq:
+    <<: *backend
+    command: bundle exec sidekiq -C config/sidekiq.yml
+
+  postgres:
+    image: postgres:11.1
+    volumes:
+      - ./.psqlrc:/root/.psqlrc:ro
+      - postgres:/var/lib/postgresql/data
+      - ./log:/root/log:cached
+      - .dockerdev/pg-init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PSQL_HISTFILE=/root/log/.psql_history
+      - POSTGRES_MULTIPLE_DATABASES=mycloud_development,mycloud_test
+    ports:
+      - 5432
+    tty: true
+    stdin_open: true
+
+  redis:
+    image: redis:4.0.9-alpine
+    volumes:
+      - redis:/data
+    ports:
+      - 6379
+
+  webpacker:
+    <<: *app
+    command: ./bin/webpack-dev-server
+    ports:
+      - '3035:3035'
+    volumes:
+      - ./:/app:cached
+      - bundle:/bundle
+      - node_modules:/app/node_modules
+      - packs:/app/public/packs
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - RAILS_ENV=${RAILS_ENV:-development}
+      - WEBPACKER_DEV_SERVER_HOST=0.0.0.0
+
+volumes:
+  postgres:
+  redis:
+  bundle:
+  node_modules:
+  rails_cache:
+  packs:
